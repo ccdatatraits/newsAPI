@@ -6,7 +6,6 @@ use serde_json::Value;
 use std::{borrow::Cow, error::Error};
 
 trait INews: HostEndpointURLBuilder {
-    // async fn fetch(identifier: NewsIdentifier);
     fn fetch(&self) -> Result<GNewsStruct, Box<dyn Error>> {
         let full_url = self.build_url();
         // eprintln!("{}", full_url);
@@ -106,17 +105,24 @@ const HOST_SEARCH_ENDPOINT_DEFAULT: &str = "/api/v4/search";
 impl GNewsSearch<'_> {
     pub fn new(
         search_term: &str,
-        search_optional_countrycode: Option<&str>,
+        search_optional_fields_to_search: Option<String>,
+        search_optional_countrycode: Option<String>,
         search_max_results: Option<u32>, // None or 1-10 for free gnews.io membership
     ) -> Self {
+        let sth: String = "".to_owned();
         Self {
             host_url: Cow::Owned(HOST_URL_DEFAULT.to_owned()),
             host_endpoint: Cow::Owned(HOST_SEARCH_ENDPOINT_DEFAULT.to_owned()),
-            host_endpoint_params: Cow::<String>::Owned(format!(
-                "?q={}&lang=en&country={}&max={}&apikey=",
+            host_endpoint_params: Cow::Owned(format!(
+                "?q={}{}&lang=en&country={}&max={}&apikey=",
                 search_term,
-                search_optional_countrycode.unwrap_or("us"),
-                search_max_results.unwrap_or(10)
+                search_optional_fields_to_search.map_or("".to_string(), |mut v| {
+                    let mut r = String::from("&in=");
+                    r.push_str(&v);
+                    r
+                }),
+                search_optional_countrycode.unwrap_or("us".to_string()),
+                search_max_results.unwrap_or(5)
             )),
         }
     }
@@ -143,7 +149,12 @@ fn main() {
     dotenv().ok();
 
     println!("\nNEWS Aggregator\n");
-    let /*mut*/ gnews = GNewsSearch::new("quantum", Some("au"), None);
+    let mut gnews = GNewsSearch::new(
+        "quantum",
+        Some("title,description".to_owned()),
+        Some("au".to_string()),
+        Some(5),
+    );
     // println!("{}", gnews.get_params());
     let gnews_news = gnews.fetch();
     println!("{gnews_news:#?}");
