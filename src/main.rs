@@ -1,60 +1,17 @@
-// #![allow(unused)]
-
-// #[derive(Debug)]
-// struct QEString(String);
-
-// // impl Into<QEString<'_>> for &str {
-// // fn into(self) -> QEString<'static> {
-// //     QEString::<'_>(self)
-// // }
-// impl From<&str> for QEString {
-//     fn from(value: &str) -> Self {
-//         Self(String::from(value))
-//     }
-// }
-// // impl AsRef<QEString> for &str {
-// //     fn as_ref(&self) -> &QEString {
-// //         &QEString(self.to_string())
-// //     }
-// // }
+#![allow(unused)]
 
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-// use std::{borrow::Cow, error::Error, rc::Rc};
-use std::error::Error;
+use std::{borrow::Cow, error::Error};
 
-// struct NewsIdentifier(usize);
-// #[derive(Default)]
-// struct NewsParameters(String);
-// impl NewsParameters {
-//     pub fn new() -> Self {
-//         Self(
-//             "?category=general&lang=en&country=us&max=10&apikey=<GO_TO_GNEWS_DASHBOARD_AND_COPY_PASTE_API_KEY_HERE>"
-//                 .to_owned(),
-//         )
-//     }
-// }
-
-trait INews {
+trait INews: HostEndpointURLBuilder {
     // async fn fetch(identifier: NewsIdentifier);
-    /*async */
-    // fn fetch_top(&self) -> Result<String, Box<dyn Error>>;
-    fn fetch_top(&self) -> Result<GNewsStruct, Box<dyn Error>>;
-}
-
-impl INews for GNews {
-    /*async */
-    // fn fetch_top(&self) -> Result<String, Box<dyn Error>> {
-    fn fetch_top(&self) -> Result<GNewsStruct, Box<dyn Error>> {
+    fn fetch(&self) -> Result<GNewsStruct, Box<dyn Error>> {
         let full_url = self.build_url();
+        // eprintln!("{}", full_url);
         let body = reqwest::blocking::get(full_url)?.text()?;
-        // let v: Value = serde_json::from_str(&body)?;
         let g: GNewsStruct = serde_json::from_str(&body)?;
-        // Ok(GNewsStruct {
-        //     total_articles: v["totalArticles"].clone(),
-        //     articles: v["articles"].clone(),
-        // })
         Ok(g)
     }
 }
@@ -64,13 +21,7 @@ pub struct GNewsStruct {
     total_articles: Value,
     articles: Vec<GNewsArticle>,
 }
-// pub struct GNewsStruct(Value);
 
-// fn convert_json_to_struct() {
-//     // create a raw JSON string from the json! macro and turn it into a MyStruct struct
-//     let raw_json_string = json!({"message": "Hello world!"});
-//     let my_struct: MyStruct = serde_json::from_str(raw_json_string).unwrap();
-// }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GNewsArticle {
@@ -87,61 +38,113 @@ pub struct GNewsArticleSource {
     name: String,
     url: String,
 }
-// impl GNewsArticle {
-//     pub fn new() -> Self {
-//         Self {
-//             ..Default::default()
-//         }
-//     }
-// }
 
-#[derive(Default)]
-pub struct GNews {
-    // host_url: Cow<'static, str>,
-    // host_endpoint: Cow<'static, str>,
-    // host_endpoint_params: Cow<'static, str>,
-    host_url: String,
-    host_endpoint: String,
-    host_endpoint_params: String,
-}
-const HOST_URL_DEFAULT: &str = "https://gnews.io";
-const HOST_ENDPOINT_DEFAULT: &str = "/api/v4/top-headlines";
-const HOST_ENDPOINT_PARAMS_DEFAULT: &str = "?category=general&lang=en&country=us&max=10&apikey=";
-impl GNews {
-    // const HOST_URL_DEFAULT: Cow<'static, str> = Cow::Borrowed("https://gnews.io");
-    // const HOST_ENDPOINT_DEFAULT: Cow<'static, str> = Cow::Borrowed("/api/v4/top-headlines");
-    // const HOST_ENDPOINT_PARAMS_DEFAULT: Cow<'static, str> =
-    //     Cow::Borrowed(format!("?category=general&lang=en&country=us&max=10&apikey=").as_ref());
-    pub fn new() -> Self {
-        Self {
-            host_url: HOST_URL_DEFAULT.to_owned(),
-            host_endpoint: HOST_ENDPOINT_DEFAULT.to_string(),
-            host_endpoint_params: HOST_ENDPOINT_PARAMS_DEFAULT.into(),
-            ..Default::default()
-        }
-    }
-    pub fn build_url(&self) -> String {
-        let mut params = self.host_endpoint_params.clone();
-        let gnews_api_key = std::env::var("GNEWS_API_KEY").unwrap();
-        params.push_str(&gnews_api_key);
+pub trait HostEndpointURLBuilder {
+    fn get_host_url(&self) -> String;
+    fn get_host_endpoint(&self) -> String;
+    fn get_host_endpoint_params(&self) -> String;
+    fn build_url(&self) -> String {
+        let params = if "" == self.get_host_endpoint_params() {
+            "".to_owned() // Defaults to no params if the host / API allows it
+        } else {
+            let mut params = self.get_host_endpoint_params();
+            let gnews_api_key = std::env::var("GNEWS_API_KEY").unwrap();
+            params.push_str(&gnews_api_key);
+            params
+        };
         format!(
             "{}{}{}",
-            self.host_url.clone(),
-            self.host_endpoint.clone(),
+            self.get_host_url(),
+            self.get_host_endpoint(),
             params,
         )
         .to_string()
     }
 }
 
+#[derive(Default)]
+pub struct GNewsTopHeadlines {
+    host_url: String,
+    host_endpoint: String,
+    host_endpoint_params: String,
+}
+const HOST_URL_DEFAULT: &str = "https://gnews.io";
+
+const HOST_TOP_HEADLINES_ENDPOINT_DEFAULT: &str = "/api/v4/top-headlines";
+const HOST_TOP_HEADLINES_ENDPOINT_PARAMS_DEFAULT: &str =
+    "?category=general&lang=en&country=us&max=10&apikey=";
+impl GNewsTopHeadlines {
+    pub fn new() -> Self {
+        Self {
+            host_url: HOST_URL_DEFAULT.to_owned(),
+            host_endpoint: HOST_TOP_HEADLINES_ENDPOINT_DEFAULT.to_string(),
+            host_endpoint_params: HOST_TOP_HEADLINES_ENDPOINT_PARAMS_DEFAULT.into(),
+        }
+    }
+}
+impl HostEndpointURLBuilder for GNewsTopHeadlines {
+    fn get_host_url(&self) -> String {
+        self.host_url.to_string()
+    }
+
+    fn get_host_endpoint(&self) -> String {
+        self.host_endpoint.to_string()
+    }
+
+    fn get_host_endpoint_params(&self) -> String {
+        self.host_endpoint_params.to_owned()
+    }
+}
+impl INews for GNewsTopHeadlines {}
+
+pub struct GNewsSearch<'a> {
+    host_url: Cow<'a, String>,
+    host_endpoint: Cow<'a, String>,
+    host_endpoint_params: Cow<'a, String>,
+}
+const HOST_SEARCH_ENDPOINT_DEFAULT: &str = "/api/v4/search";
+impl GNewsSearch<'_> {
+    pub fn new(
+        search_term: &str,
+        search_optional_countrycode: Option<&str>,
+        search_max_results: Option<u32>, // None or 1-10 for free gnews.io membership
+    ) -> Self {
+        Self {
+            host_url: Cow::Owned(HOST_URL_DEFAULT.to_owned()),
+            host_endpoint: Cow::Owned(HOST_SEARCH_ENDPOINT_DEFAULT.to_owned()),
+            host_endpoint_params: Cow::<String>::Owned(format!(
+                "?q={}&lang=en&country={}&max={}&apikey=",
+                search_term,
+                search_optional_countrycode.unwrap_or("us"),
+                search_max_results.unwrap_or(10)
+            )),
+        }
+    }
+    pub fn get_params(&mut self) -> String {
+        self.host_endpoint_params.clone().into_owned()
+    }
+}
+impl HostEndpointURLBuilder for GNewsSearch<'_> {
+    fn get_host_url(&self) -> String {
+        self.host_url.to_string()
+    }
+
+    fn get_host_endpoint(&self) -> String {
+        self.host_endpoint.to_string()
+    }
+
+    fn get_host_endpoint_params(&self) -> String {
+        self.host_endpoint_params.to_string()
+    }
+}
+impl INews for GNewsSearch<'_> {}
+
 fn main() {
     dotenv().ok();
 
-    println!("NEWS Aggregator");
-
-    // let n = GNews::new().build_url();
-    // println!("{:?}", n);
-    let gnews = GNews::new();
-    let gnews_top_news = gnews.fetch_top();
-    println!("{gnews_top_news:?}");
+    println!("\nNEWS Aggregator\n");
+    let /*mut*/ gnews = GNewsSearch::new("quantum", Some("au"), None);
+    // println!("{}", gnews.get_params());
+    let gnews_news = gnews.fetch();
+    println!("{gnews_news:#?}");
 }
