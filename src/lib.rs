@@ -14,12 +14,17 @@ pub mod qemod {
             Ok(g)
         }
     }
-    #[derive(Debug, Deserialize, Serialize)]
+    #[derive(Debug, Default, Deserialize, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GNewsStruct {
         total_articles: Value,
         articles: Vec<GNewsArticle>,
     }
+    // impl GNewsStruct {
+    //     pub fn get_total_articles(&self) -> &[GNewsArticle] {
+    //         self.articles.as_slice()
+    //     }
+    // }
     #[derive(Debug, Deserialize, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GNewsArticle {
@@ -58,7 +63,7 @@ pub mod qemod {
             .to_string()
         }
     }
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     pub struct GNewsTopHeadlines {
         host_url: String,
         host_endpoint: String,
